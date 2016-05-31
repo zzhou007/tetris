@@ -1,3 +1,23 @@
+#ifndef TETRIS_H
+#define TETRIS_H
+//for rand
+#include <stdlib.h>
+
+void initrand() {
+	srand(0);
+}
+
+char color() {
+	unsigned char r = rand() % 3;
+	if (r == 0) {
+		return 'r';
+	} else if (r == 1) {
+		return 'g';
+	} else {
+		return 'b';
+	}
+}
+
 struct block {
 	//row, col, color
 	//pivot
@@ -15,7 +35,68 @@ struct block {
 //{'0','1','2','2'}
 //}
 
+struct block initcolor(char pos1[], char pos2[], char pos3[], char pos4[]) {
+	struct block b;
+	b.pivot[0] = pos1[0];
+	b.pivot[1] = pos1[1];
+	b.pivot[2] = color();
+	
+	b.chunk1[0] = pos2[0];
+	b.chunk1[1] = pos2[1];
+	b.chunk1[2] = color();
+
+	b.chunk2[0] = pos3[0];
+	b.chunk2[1] = pos3[1];
+	b.chunk2[2] = color();
+
+	b.chunk3[0] = pos4[0];
+	b.chunk3[1] = pos4[1];
+	b.chunk3[2] = color();
+
+	return b;
+}
+
+struct block initblock(char n) {
+	char r = rand() % n;
+	char pos1[2];
+	char pos2[2];
+	char pos3[2];
+	char pos4[2];
+	if (r == 0) {
+		//L shape
+		pos1[0] = 0; pos1[1] = 3;
+		pos2[0] = 0; pos2[1] = 4;
+		pos3[0] = 1; pos3[1] = 3;
+		pos4[0] = 2; pos4[1] = 3;
+	} else if (r == 1) {
+		// I shape
+		pos1[0] = 1; pos1[1] = 3;
+		pos2[0] = 0; pos2[1] = 3;
+		pos3[0] = 2; pos3[1] = 3;
+		pos4[0] = 3; pos4[1] = 3;
+	} else if (r == 2) {
+		// square
+		pos1[0] = 1; pos1[1] = 3;
+		pos2[0] = 0; pos2[1] = 3;
+		pos3[0] = 1; pos3[1] = 4;
+		pos4[0] = 0; pos4[1] = 4;
+	}
+	struct block b = initcolor(pos1, pos2, pos3, pos4);
+	return b;
+} 
+
 extern char board[9][8];
+extern char output[9][8];
+
+//displays the block on 8x8
+void display(struct block b) {
+	updateout();
+	output[b.pivot[0]][b.pivot[1]] = b.pivot[2];
+	output[b.chunk1[0]][b.chunk1[1]] = b.chunk1[2];
+	output[b.chunk2[0]][b.chunk2[1]] = b.chunk2[2];
+	output[b.chunk3[0]][b.chunk3[1]] = b.chunk3[2];
+}
+
 //rotates the piece clockwise
 //does nothing if does not work
 struct block rotate (struct block b) {
@@ -68,6 +149,7 @@ struct block rotate (struct block b) {
 
 //drops a block down one row
 //returns same block and check to -1 if it cant
+//check is 1 if it can
 struct block drop (struct block b) {
 	//make a copy
 	struct block temp = b;
@@ -81,7 +163,7 @@ struct block drop (struct block b) {
 		temp.check = -1;
 		return temp;
 	}
-	
+	b.check = 1;
 	//return piece
 	return b;
 }
@@ -124,6 +206,11 @@ struct block moveright (struct block b) {
 
 //combines the board and a block
 void combine (struct block b) {
+	board[b.pivot[0]][b.pivot[1]] = b.pivot[2];
+	board[b.chunk1[0]][b.chunk1[1]] = b.chunk1[2];
+	board[b.chunk2[0]][b.chunk2[1]] = b.chunk2[2];
+	board[b.chunk3[0]][b.chunk3[1]] = b.chunk3[2];
+
 	
 }
 
@@ -161,3 +248,5 @@ int checkboard (struct block b) {
 		
 	return 1;
 }
+
+#endif TETRIS_H
