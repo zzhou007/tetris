@@ -16,6 +16,7 @@ typedef struct _task {
 } task;
 
 ///shared variables
+unsigned char score = 0;
 
 //sm1 program
 //sends button presses
@@ -45,8 +46,22 @@ int sm1tick(int state) {
 
 //sm2
 //receive info
-enum sm2_States{sm2display};
+enum sm2_States{sm2get};
 int sm2tick(int state) {
+	//transition
+	switch(state) {
+		case -1:
+			state = sm2get;
+			break;
+	}
+	switch(state) {
+		case sm2get:
+		if (USART_HasReceived(1)) {
+			score = USART_Receive(1);
+			USART_Flush(1);
+		}
+		break;
+	}
 	return state;
 }
 
@@ -54,6 +69,22 @@ int sm2tick(int state) {
 //outputs to screen
 enum sm3_States{sm3display};
 int sm3tick(int state) {
+	lcd_clear();
+	//holds converted string
+	char strScore[5];
+	char strLevel[5];
+	//calculate level
+	unsigned char level = score / 10;
+	//convert to string
+	itoa(score, strScore, 10);
+	itoa(level, strLevel, 10);
+	//prints current score
+	lcd_str("score: ");
+	lcd_str(strScore);
+	//prints current level
+	lcd_chr('\n');
+	lcd_str("level: ");
+	lcd_str(strLevel);
 	return state;
 }
 
@@ -92,7 +123,7 @@ int main(void)
 	//sm4 = sends info 
 	unsigned long int sm1 = 20;
 	unsigned long int sm2 = 1;
-	unsigned long int sm3 = 1;
+	unsigned long int sm3 = 1000;
 	unsigned long int sm4 = 1;
 	
 	//calculating gcd
@@ -145,7 +176,6 @@ int main(void)
 	//communications
 	initUSART(0);
 	initUSART(1);
-
 	//run
 	while(1){
 		for ( i = 0; i < numTasks; i++ ) {
