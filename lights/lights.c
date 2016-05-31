@@ -25,10 +25,37 @@ char board[9][8] = {
 	{'x','x','x','r','g','x','x','x'},
 	{'x','x','x','b','r','x','x','x'},
 	{'x','x','x','g','b','x','x','x'},
-	{'r','r','r','r','g','r','r','r'},
+	{'x','x','x','r','g','x','x','x'},
 	{'x','x','x','b','r','x','x','x'},
 	{'x','x','x','g','b','x','x','x'}
 };
+
+//the output shown on screen
+char output[9][8] = {
+	{'x','r','g','b','r','g','b','x'},
+	{'x','r','g','b','r','g','b','x'},
+	{'x','r','g','b','r','g','b','x'},
+	{'x','x','x','r','g','x','x','x'},
+	{'x','x','x','b','r','x','x','x'},
+	{'x','x','x','g','b','x','x','x'},
+	{'x','x','x','r','g','x','x','x'},
+	{'x','x','x','b','r','x','x','x'},
+	{'x','x','x','g','b','x','x','x'}
+};
+
+//variable to start the game
+char gamestart = 0;
+//variable to hold score
+unsigned char score = 0;
+//sets output to be board
+void updateout() {
+	unsigned char i, j;
+	for (i = 0; i < 9; i++) {
+		for (j = 0; j < 8; j++) {
+			output[i][j] = board[i][j];
+		}
+	}
+}
 
 //clears the board
 void clearboard() {
@@ -73,6 +100,7 @@ void delrow(unsigned char row) {
 	for (j = 0; j < 8; j++) {
 		board[0][j] = 'x';
 	}
+	score = score + 8;
 }
 
 //which row is going to light up
@@ -84,6 +112,8 @@ unsigned char button2 = 0;
 unsigned char button3 = 0;
 unsigned char button4 = 0;
 unsigned char button5 = 0;
+//current block that is moving
+struct block b;
 
 //sm1 program
 //lights up one row after another
@@ -156,19 +186,19 @@ int sm2tick(int state) {
 			//light up all cols for that row
 			for (int i = 0; i < 8; i++) {
 				//sets col that needs to be blue 1
-				if (board[row][i] == 'b') {
+				if (output[row][i] == 'b') {
 					bluecol = bluecol | (0x80 >> i);
 				}
 				//sets col that needs to be red 1
-				else if (board[row][i] == 'r') {
+				else if (output[row][i] == 'r') {
 					redcol = redcol | (0x80 >> i);
 				}
 				//sets col that needs to be green to 1
-				else if (board[row][i] == 'g') {
+				else if (output[row][i] == 'g') {
 					greencol = greencol | (0x80 >> i);
 				}
 				//sets the col that needs to be off to 1
-				else if (board[row][i] == 'x') {
+				else if (output[row][i] == 'x') {
 					offcol = offcol | (0x80 >> i);
 				}
 			}
@@ -208,10 +238,15 @@ int sm3tick(int state) {
 				if ((temp & 0xC0) == 0x00) {
 					button0 = temp & 0x01;
 					button1 = temp & 0x02;
+					button1 = button1 >> 1;
 					button2 = temp & 0x04;
+					button2 = button2 >> 2;
 					button3 = temp & 0x08;
+					button3 = button3 >> 3;
 					button4 = temp & 0x10;
+					button4 = button4 >> 4;
 					button5 = temp & 0x20;
+					button5 = button5 >> 5;
 				}
 			}
 			break;
@@ -220,14 +255,121 @@ int sm3tick(int state) {
 }
 
 //sm4
-enum sm4_States{sm4test};
+//starts the game
+enum sm4_States{sm4start};
 int sm4tick(int state) {
-	if (button4)
-		delrow(5);
-	if (button3)
-		checkrow();
-	if (button2)
+	if (button3 == 1) {
+		//reset board game start
 		clearboard();
+		updateout();
+		//reset score
+		score = 0;
+		//set game start to 1
+		gamestart = 1;	
+	}
+	else {
+		gamestart = 0;
+	}
+	return state;
+}
+
+enum sm5_States{sm5start, sm5play, sm5lose};
+int sm5tick(int state) {
+	//if player loses the game
+	static char lose;
+	//transaction
+	switch (state) {
+		case -1:
+			state = sm5start;
+			break;
+		case sm5start:
+			if (gamestart == 1) {
+				lose = 0;
+				b = initblock(3);
+				state = sm5play;
+			}
+			break;
+		case sm5play:
+			if (lose == 1)
+				state = sm5start;
+			break;
+		case sm5lose:
+			state = sm5start;
+			break;
+	}
+	//action
+	//controls the speed of the blocks
+	static unsigned long timer = 0;
+	switch (state) {
+		case sm5play:
+			if (timer > (1000 - (score/10))) {
+				if (drop(b).check == 1) {
+					b = drop(b);
+					display(b);
+				} else {
+					combine(b);
+					checkrow();
+					updateout();
+					b = initblock(3);
+					if (checkboard(b) == -1)
+						lose = 1;
+				}
+				timer = 0;
+			}
+			timer++;
+			break;
+	}
+	return state;		
+}
+
+enum sm6_States{sm6input, sm6press};
+int sm6tick(int state) {
+	switch (state) {
+		case -1:
+			state = sm6input;
+			break;
+		case sm6input:
+			if (button0 == 1) {
+				b = moveright(b);
+				display(b);
+				state = sm6press;
+			}
+			if (button1 == 1) {
+				b = rotate(b);
+				display(b);
+				state = sm6press;
+			}
+			if (button2 == 1) {
+				b = moveleft(b);
+				display(b);
+				state = sm6press;
+			}
+			break;
+		case sm6press:
+			if (!button0 && !button1 && !button2)
+				state = sm6input;
+			break;
+	}
+	return state;	
+}
+
+//sends score
+enum sm7_States{sm7send};
+int sm7tick(int state) {
+	//transition
+	switch(state) {
+		case -1:
+			state = sm7send;
+			break;
+	}
+	//action
+	switch(state) {
+		case sm7send:
+			if (USART_IsSendReady(1)) {
+				USART_Send(score, 1);
+			}
+			break;
+	}
 	return state;
 }
 
@@ -256,16 +398,26 @@ int main(void)
 	//sm1 = shift register 
 	//sm2 = lighting 8x8 led matrix
 	//sm3 pulls button presses from usart
+	//sm4 starts the game
+	//sm5 moves the blocks down
+	//sm6 takes user inputs to control the block
+	//sm7 sends the score
 	unsigned long int sm1 = 1;
 	unsigned long int sm2 = 1;
 	unsigned long int sm3 = 10;
-	unsigned long int sm4 = 1000;
+	unsigned long int sm4 = 20;
+	unsigned long int sm5 = 1;
+	unsigned long int sm6 = 20;
+	unsigned long int sm7 = 1000;
 	
 	//calculating gcd
 	unsigned long int tmpGCD = 1;
 	tmpGCD = findGCD(sm1, sm2);
 	tmpGCD = findGCD(tmpGCD, sm3);
 	tmpGCD = findGCD(tmpGCD, sm4);
+	tmpGCD = findGCD(tmpGCD, sm5);
+	tmpGCD = findGCD(tmpGCD, sm6);
+	tmpGCD = findGCD(tmpGCD, sm7);
 	
 	//setting gcd
 	unsigned long int gcd = tmpGCD;
@@ -275,10 +427,13 @@ int main(void)
 	unsigned long int sm2_period = sm2/gcd;
 	unsigned long int sm3_period = sm3/gcd;
 	unsigned long int sm4_period = sm4/gcd;
+	unsigned long int sm5_period = sm5/gcd;
+	unsigned long int sm6_period = sm6/gcd;
+	unsigned long int sm7_period = sm7/gcd;
 	
 	//declare array o tasks
-	static task task1, task2, task3, task4;
-	task *tasks[] = {&task1, &task2, &task3, &task4};
+	static task task1, task2, task3, task4, task5, task6, task7;
+	task *tasks[] = {&task1, &task2, &task3, &task4, &task5, &task6, &task7};
 	const unsigned short numTasks = sizeof(tasks)/sizeof(task*);
 	
 	//task 1
@@ -301,7 +456,23 @@ int main(void)
 	task4.period = sm4_period;
 	task4.elapsedTime = sm4_period;
 	task4.TickFct = &sm4tick;
+	//task 5
+	task5.state = -1;
+	task5.period = sm5_period;
+	task5.elapsedTime = sm5_period;
+	task5.TickFct = &sm5tick;
+	//task6
+	task6.state = -1;
+	task6.period = sm6_period;
+	task6.elapsedTime = sm6_period;
+	task6.TickFct = &sm6tick;
+	//task7
+	task7.state = -1;
+	task7.period = sm7_period;
+	task7.elapsedTime = sm7_period;
+	task7.TickFct = &sm7tick;
 
+	
 	//init
 	TimerSet(gcd);
 	TimerOn();
@@ -309,6 +480,8 @@ int main(void)
 	//communication
 	initUSART(0);
 	initUSART(1);
+	//color generator and random piece
+	initrand();
 
 	//run
 	while(1){
