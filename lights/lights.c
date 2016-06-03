@@ -5,6 +5,10 @@
 #include "usart_ATmega1284.h"
 //for tetris
 #include "tetris.h"
+//for swaping rows
+#include <stdlib.h>
+
+#define NUMBLOCK 4
 
 typedef struct _task {
 	signed char state;
@@ -57,6 +61,9 @@ void updateout() {
 	}
 }
 
+//number of lines cleared
+unsigned long lineclear = 0;
+
 //clears the board
 void clearboard() {
 	unsigned char i, j;
@@ -64,6 +71,24 @@ void clearboard() {
 		for (j = 0; j < 8; j++) {
 			board[i][j] = 'x';
 		}
+	}
+}
+
+//swaps two different rows 
+void swaprows(unsigned char row1, unsigned char row2) {
+	unsigned char j;
+	char tmp[8];
+	//store row1
+	for (j = 0; j < 8; j++) {
+		tmp[j] = board[row1][j];
+	}
+	//change row1
+	for (j = 0; j < 8; j++) {
+		board[row1][j] = board[row2][j];
+	}
+	//change row2
+	for (j = 0; j < 8; j++) {
+		board[row2][j] = tmp[j];
 	}
 }
 
@@ -86,6 +111,45 @@ void checkrow() {
 	}
 }
 
+//check col to see if it matches 
+void checkcol() {
+	//row col 
+	unsigned char i, j;
+	//holds number of blocks
+	unsigned char num = 1;
+	//holds the color of block
+	char color = 0;
+	//iterate over col
+	unsigned char col = 0;
+	unsigned char row = 0;
+	unsigned char numremove = 0;
+	for (i = 0; i < 8; i++) {
+		num = 0;
+		numremove = 0;
+		//iterate over rows
+		for (j = 0; j < 9; j++) {
+			//check for multiple blocks of the same color
+			if ((board[j][i] == color) && (board[j][i] != 'x')) {
+				num++;
+			} else {
+				color = board[j][i];
+				num = 1;
+			}
+			//if more than 3 save pos
+			if (num >= 3) {
+				numremove = num;
+				col = i;
+				row = j;
+			}
+		}
+		//del col
+		//check col again
+		if (numremove > 0) {
+			delcol(row, col, numremove);
+			i--;
+		}
+	}
+}
 //removes a row
 //drops everything down one row
 void delrow(unsigned char row) {
@@ -101,6 +165,19 @@ void delrow(unsigned char row) {
 		board[0][j] = 'x';
 	}
 	score = score + 8;
+	lineclear++;
+}
+
+void delcol(unsigned char row, unsigned char col, unsigned char num) {
+	//move col down num times starting at pos row
+	unsigned char i;
+	for (i = 0; i < num; i++) {
+		if ((row - num - i) >= 0)
+			board[row - i][col] = board[row - num - i][col];
+		else
+			board[row - i][col] = 'x';
+	}
+	score = score + num;
 }
 
 //which row is going to light up
@@ -120,6 +197,12 @@ struct block b;
 //uses shift register 
 enum sm1_States{sm1wait, sm1row};
 int sm1tick(int state) {
+	//turn everything off to remove
+	//carry over
+	PORTA = 0xFF;
+	PORTB = 0xFF;
+	PORTC = 0xFF;
+
 	//transition
 	switch (state) {
 		case -1:
@@ -285,7 +368,7 @@ int sm5tick(int state) {
 		case sm5start:
 			if (gamestart == 1) {
 				lose = 0;
-				b = initblock(3);
+				b = initblock(NUMBLOCK);
 				state = sm5play;
 			}
 			break;
@@ -309,8 +392,15 @@ int sm5tick(int state) {
 				} else {
 					combine(b);
 					checkrow();
+					checkcol();
 					updateout();
-					b = initblock(3);
+					if (lineclear >= 2) {
+						unsigned char row1 = rand() % 3 + 6;
+						unsigned char row2 = rand() % 3 + 6;
+						swaprows(row1, row2);
+						lineclear = 0;
+					}
+					b = initblock(NUMBLOCK);
 					if (checkboard(b) == -1)
 						lose = 1;
 				}
@@ -343,6 +433,12 @@ int sm6tick(int state) {
 				b = moveleft(b);
 				display(b);
 				state = sm6press;
+			}
+			if (button4 ==1) {
+				if (score >= 10)
+				score = score - 10;
+				delrow(8);
+				score = score - 8;
 			}
 			break;
 		case sm6press:
@@ -482,6 +578,8 @@ int main(void)
 	initUSART(1);
 	//color generator and random piece
 	initrand();
+	//init rand for row swap
+	srand(0);
 
 	//run
 	while(1){
