@@ -4,7 +4,8 @@
 #include <stdlib.h>
 
 void initrand() {
-	srand(0);
+	unsigned char a;
+	srand(a);
 }
 
 char color() {
@@ -80,6 +81,12 @@ struct block initblock(char n) {
 		pos2[0] = 0; pos2[1] = 3;
 		pos3[0] = 1; pos3[1] = 4;
 		pos4[0] = 0; pos4[1] = 4;
+	} else if (r == 3) {
+		//t shape
+		pos1[0] = 1; pos1[1] = 3;
+		pos2[0] = 0; pos2[1] = 3;
+		pos3[0] = 1; pos3[1] = 4;
+		pos4[0] = 1; pos4[1] = 2;
 	}
 	struct block b = initcolor(pos1, pos2, pos3, pos4);
 	return b;
